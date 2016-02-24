@@ -101,11 +101,34 @@ public :
     double InterpolationFunction(int, double);
 	double InterpolationFunctionHilbert(int, double);
 
+    void CheckFilter();
+
 };
 
 
 using namespace std;
 using namespace cv;
+
+void SeparableSteerableFilter::CheckFilter()
+{
+    cout << "The design and use of steerable filters. IEEE Transactions on Pattern analysis and machine intelligence 13 (9). pp. 891–906.  \n";
+    for (int i = 0; i < fSepX.size(); i++)
+    {
+        cout << "******************  Filter " << i << " ******************\n";
+        cout << "xFilter  "<< fSepX[i]<<endl;
+        cout << "yFilter' "<< fSepY[i].t()<<endl;
+    }
+    cout << "\n***********************************************************\n";
+    cout << "****  QUADRATURE FILTER ***********\n";
+    for (int i = 0; i < hilbertX.size(); i++)
+    {
+        cout << "******************  Filter " << i << " ******************\n";
+        cout << "xFilter  "<< hilbertX[i]<<endl;
+        cout << "yFilter'  "<< hilbertY[i].t()<<endl;
+    }
+}
+
+
 
 double SeparableSteerableFilter::InterpolationFunction(int n, double angle)
 {
@@ -249,8 +272,9 @@ SeparableSteerableFilter::SeparableSteerableFilter(int n,int height,double step)
             }
         }
         SVD::compute(filter,s,u,v);
-        fSepX.push_back(u.col(0)*sqrt(s.at<float>(0,0)));
-        fSepY.push_back(v.row(0)*sqrt(s.at<float>(0,0)));
+
+        fSepY.push_back(u.col(0)/u.at<float>(height/2,0));
+        fSepX.push_back(v.row(0)*u.at<float>(height/2,0)*s.at<float>(0,0));
         for (int i = 0; i < height; i++)
         {
             float y=static_cast<float>(i-height/2)*step;
@@ -261,8 +285,8 @@ SeparableSteerableFilter::SeparableSteerableFilter(int n,int height,double step)
             }
         }
         SVD::compute(filter,s,u,v);
-        fSepX.push_back(u.col(0)*sqrt(s.at<float>(0,0)));
-        fSepY.push_back(v.row(0)*sqrt(s.at<float>(0,0)));
+        fSepY.push_back(u.col(0)*sqrt(s.at<float>(0,0)));
+        fSepX.push_back(v.row(0)*sqrt(s.at<float>(0,0)));
         for (int i = 0; i < height; i++)
         {
             float y=static_cast<float>(i-height/2)*step;
@@ -273,8 +297,8 @@ SeparableSteerableFilter::SeparableSteerableFilter(int n,int height,double step)
             }
         }
         SVD::compute(filter,s,u,v);
-        fSepX.push_back(u.col(0)*sqrt(s.at<float>(0,0)));
-        fSepY.push_back(v.row(0)*sqrt(s.at<float>(0,0)));
+        fSepY.push_back(u.col(0)/u.at<float>(height/2,0));
+        fSepX.push_back(v.row(0)*u.at<float>(height/2,0)*s.at<float>(0,0));
 // Hilbert transform
         for (int i = 0; i < height; i++)
         {
@@ -286,8 +310,8 @@ SeparableSteerableFilter::SeparableSteerableFilter(int n,int height,double step)
             }
         }
         SVD::compute(filter,s,u,v);
-        hilbertX.push_back(u.col(0)*sqrt(s.at<float>(0,0)));
-        hilbertY.push_back(v.row(0)*sqrt(s.at<float>(0,0)));
+        hilbertY.push_back(u.col(0)*sqrt(s.at<float>(0,0)));
+        hilbertX.push_back(v.row(0)*sqrt(s.at<float>(0,0)));
         for (int i = 0; i < height; i++)
         {
             float y=static_cast<float>(i-height/2)*step;
@@ -298,8 +322,8 @@ SeparableSteerableFilter::SeparableSteerableFilter(int n,int height,double step)
             }
         }
         SVD::compute(filter,s,u,v);
-        hilbertX.push_back(u.col(0)*sqrt(s.at<float>(0,0)));
-        hilbertY.push_back(v.row(0)*sqrt(s.at<float>(0,0)));
+        hilbertY.push_back(u.col(0)*sqrt(s.at<float>(0,0)));
+        hilbertX.push_back(v.row(0)*sqrt(s.at<float>(0,0)));
         for (int i = 0; i < height; i++)
         {
             float y=static_cast<float>(i-height/2)*step;
@@ -310,8 +334,8 @@ SeparableSteerableFilter::SeparableSteerableFilter(int n,int height,double step)
             }
         }
         SVD::compute(filter,s,u,v);
-        hilbertX.push_back(u.col(0)*sqrt(s.at<float>(0,0)));
-        hilbertY.push_back(v.row(0)*sqrt(s.at<float>(0,0)));
+        hilbertY.push_back(u.col(0)*sqrt(s.at<float>(0,0)));
+        hilbertX.push_back(v.row(0)*sqrt(s.at<float>(0,0)));
         for (int i = 0; i < height; i++)
         {
             float y=static_cast<float>(i-height/2)*step;
@@ -322,10 +346,9 @@ SeparableSteerableFilter::SeparableSteerableFilter(int n,int height,double step)
             }
         }
         SVD::compute(filter,s,u,v);
-        hilbertX.push_back(u.col(0)*sqrt(s.at<float>(0,0)));
-        hilbertY.push_back(v.row(0)*sqrt(s.at<float>(0,0)));
-        cout << hilbertX[1]<<endl;
-        cout << hilbertY[1]<<endl;
+        hilbertY.push_back(u.col(0)*sqrt(s.at<float>(0,0)));
+        hilbertX.push_back(v.row(0)*sqrt(s.at<float>(0,0)));
+        break;
     case 4:
         for (int i = 0; i < height; i++)
         {
@@ -337,8 +360,8 @@ SeparableSteerableFilter::SeparableSteerableFilter(int n,int height,double step)
             }
         }
         SVD::compute(filter,s,u,v);
-        fSepX.push_back(u.col(0)*sqrt(s.at<float>(0,0)));
-        fSepY.push_back(v.row(0)*sqrt(s.at<float>(0,0)));
+        fSepY.push_back(u.col(0)*sqrt(s.at<float>(0,0)));
+        fSepX.push_back(v.row(0)*sqrt(s.at<float>(0,0)));
         for (int i = 0; i < height; i++)
         {
             float y=static_cast<float>(i-height/2)*step;
@@ -349,8 +372,8 @@ SeparableSteerableFilter::SeparableSteerableFilter(int n,int height,double step)
             }
         }
         SVD::compute(filter,s,u,v);
-        fSepX.push_back(u.col(0)*sqrt(s.at<float>(0,0)));
-        fSepY.push_back(v.row(0)*sqrt(s.at<float>(0,0)));
+        fSepY.push_back(u.col(0)*sqrt(s.at<float>(0,0)));
+        fSepX.push_back(v.row(0)*sqrt(s.at<float>(0,0)));
         for (int i = 0; i < height; i++)
         {
             float y=static_cast<float>(i-height/2)*step;
@@ -361,8 +384,8 @@ SeparableSteerableFilter::SeparableSteerableFilter(int n,int height,double step)
             }
         }
         SVD::compute(filter,s,u,v);
-        fSepX.push_back(u.col(0)*sqrt(s.at<float>(0,0)));
-        fSepY.push_back(v.row(0)*sqrt(s.at<float>(0,0)));
+        fSepY.push_back(u.col(0)*sqrt(s.at<float>(0,0)));
+        fSepX.push_back(v.row(0)*sqrt(s.at<float>(0,0)));
         for (int i = 0; i < height; i++)
         {
             float y=static_cast<float>(i-height/2)*step;
@@ -373,8 +396,8 @@ SeparableSteerableFilter::SeparableSteerableFilter(int n,int height,double step)
             }
         }
         SVD::compute(filter,s,u,v);
-        fSepX.push_back(u.col(0)*sqrt(s.at<float>(0,0)));
-        fSepY.push_back(v.row(0)*sqrt(s.at<float>(0,0)));
+        fSepY.push_back(u.col(0)*sqrt(s.at<float>(0,0)));
+        fSepX.push_back(v.row(0)*sqrt(s.at<float>(0,0)));
         for (int i = 0; i < height; i++)
         {
             float y=static_cast<float>(i-height/2)*step;
@@ -385,8 +408,8 @@ SeparableSteerableFilter::SeparableSteerableFilter(int n,int height,double step)
             }
         }
         SVD::compute(filter,s,u,v);
-        fSepX.push_back(u.col(0)*sqrt(s.at<float>(0,0)));
-        fSepY.push_back(v.row(0)*sqrt(s.at<float>(0,0)));
+        fSepY.push_back(u.col(0)*sqrt(s.at<float>(0,0)));
+        fSepX.push_back(v.row(0)*sqrt(s.at<float>(0,0)));
 // Hilbert transform
         for (int i = 0; i < height; i++)
         {
@@ -398,8 +421,8 @@ SeparableSteerableFilter::SeparableSteerableFilter(int n,int height,double step)
             }
         }
         SVD::compute(filter,s,u,v);
-        hilbertX.push_back(u.col(0)*sqrt(s.at<float>(0,0)));
-        hilbertY.push_back(v.row(0)*sqrt(s.at<float>(0,0)));
+        hilbertY.push_back(u.col(0)*sqrt(s.at<float>(0,0)));
+        hilbertX.push_back(v.row(0)*sqrt(s.at<float>(0,0)));
         for (int i = 0; i < height; i++)
         {
             float y=static_cast<float>(i-height/2)*step;
@@ -410,8 +433,8 @@ SeparableSteerableFilter::SeparableSteerableFilter(int n,int height,double step)
             }
         }
         SVD::compute(filter,s,u,v);
-        hilbertX.push_back(u.col(0)*sqrt(s.at<float>(0,0)));
-        hilbertY.push_back(v.row(0)*sqrt(s.at<float>(0,0)));
+        hilbertY.push_back(u.col(0)*sqrt(s.at<float>(0,0)));
+        hilbertX.push_back(v.row(0)*sqrt(s.at<float>(0,0)));
         for (int i = 0; i < height; i++)
         {
             float y=static_cast<float>(i-height/2)*step;
@@ -422,8 +445,8 @@ SeparableSteerableFilter::SeparableSteerableFilter(int n,int height,double step)
             }
         }
         SVD::compute(filter,s,u,v);
-        hilbertX.push_back(u.col(0)*sqrt(s.at<float>(0,0)));
-        hilbertY.push_back(v.row(0)*sqrt(s.at<float>(0,0)));
+        hilbertY.push_back(u.col(0)*sqrt(s.at<float>(0,0)));
+        hilbertX.push_back(v.row(0)*sqrt(s.at<float>(0,0)));
         for (int i = 0; i < height; i++)
         {
             float y=static_cast<float>(i-height/2)*step;
@@ -434,8 +457,8 @@ SeparableSteerableFilter::SeparableSteerableFilter(int n,int height,double step)
             }
         }
         SVD::compute(filter,s,u,v);
-        hilbertX.push_back(u.col(0)*sqrt(s.at<float>(0,0)));
-        hilbertY.push_back(v.row(0)*sqrt(s.at<float>(0,0)));
+        hilbertY.push_back(u.col(0)*sqrt(s.at<float>(0,0)));
+        hilbertX.push_back(v.row(0)*sqrt(s.at<float>(0,0)));
         for (int i = 0; i < height; i++)
         {
             float y=static_cast<float>(i-height/2)*step;
@@ -446,8 +469,8 @@ SeparableSteerableFilter::SeparableSteerableFilter(int n,int height,double step)
             }
         }
         SVD::compute(filter,s,u,v);
-        hilbertX.push_back(u.col(0)*sqrt(s.at<float>(0,0)));
-        hilbertY.push_back(v.row(0)*sqrt(s.at<float>(0,0)));
+        hilbertY.push_back(u.col(0)*sqrt(s.at<float>(0,0)));
+        hilbertX.push_back(v.row(0)*sqrt(s.at<float>(0,0)));
         for (int i = 0; i < height; i++)
         {
             float y=static_cast<float>(i-height/2)*step;
@@ -458,8 +481,8 @@ SeparableSteerableFilter::SeparableSteerableFilter(int n,int height,double step)
             }
         }
         SVD::compute(filter,s,u,v);
-        hilbertX.push_back(u.col(0)*sqrt(s.at<float>(0,0)));
-        hilbertY.push_back(v.row(0)*sqrt(s.at<float>(0,0)));
+        hilbertY.push_back(u.col(0)*sqrt(s.at<float>(0,0)));
+        hilbertX.push_back(v.row(0)*sqrt(s.at<float>(0,0)));
 
     }
     anchor = Point(-height/2,-height/2);
@@ -532,7 +555,31 @@ vector<Mat> SeparableSteerableFilter::GetFilterHilbert(double angle)
 
 int main(int argc, char **argv)
 {
+
+/*    {
+    Mat m = (Mat_<float>(2,2)<< 1,2,4,5);
+    Mat u,v,s;
+    SVD::compute(m,s,u,v);
+    cout << s << "\n";
+    cout << u << "\n";
+    cout << v << "\n";
+    cout << u*Mat::diag(s)*v << "\n";
+    cout <<Mat::diag(s);
+    char c=waitKey(-1);
+    Mat f=(Mat_<char>(1,1)<<(-1,0,1));
+    Mat mc=imread("f:/lib/opencv/samples/data/detect_blob.png",CV_LOAD_IMAGE_COLOR),dst1,dst2;
+    sepFilter2D(mc,dst1,CV_32F,f,f);
+    sepFilter2D(mc,dst2,CV_32F,f.t(),f.t());
+    double minV,maxV;
+    minMaxLoc(dst1-dst2,&minV,&maxV);
+    cout << "\n"<<minV << "\t" << maxV << "\n";
+    return 1;
+    }
+*/
+
+
     SeparableSteerableFilter g(4);
+    g.CheckFilter();
     Mat mc=imread("f:/lib/opencv/samples/data/detect_blob.png",CV_LOAD_IMAGE_COLOR);
     Mat mHSV;
 
