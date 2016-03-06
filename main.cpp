@@ -840,7 +840,6 @@ void     SeparableSteerableFilter::EstimateL0L1(int nbTapL0,int nbTapL1)
         {
             if (i>=2)
             {
-                maxVal *=1;
                 norme2fSepX[i-2]=sqrt(maxVal);
                 norme2fSepY[i-2]=sqrt(maxVal);
             }
@@ -861,12 +860,12 @@ void     SeparableSteerableFilter::EstimateL0L1(int nbTapL0,int nbTapL1)
         DisplayImage(m,format("Full spectrum %d",i));
 
     }
-    FileStorage fs("fullSpectrume.yml.yml", FileStorage::WRITE);
+    FileStorage fs("fullSpectrume.yml", FileStorage::WRITE);
 
     fs << "Image" << response;
-	    minMaxLoc(response, &minVal, &maxVal,&minPos,&maxPos);
-         cout << "Full spectrum "<<minVal << " " << maxVal << "\n";
-       DisplayImage(response,"Full spectrum ");
+    minMaxLoc(response, &minVal, &maxVal,&minPos,&maxPos);
+    cout << "Full spectrum "<<minVal << " " << maxVal << "\n";
+    DisplayImage(response,"Full spectrum ");
 
 }
 
@@ -877,7 +876,7 @@ int main(int argc, char **argv)
     Mat mc=imread("f:/lib/opencv/samples/data/lena.jpg",CV_LOAD_IMAGE_GRAYSCALE),dst1,dst2;
     double minValmc,maxValmc;
     minMaxIdx(mc,&minValmc,&maxValmc);
-    SeparableSteerableFilter g(2,9,0.35);
+    SeparableSteerableFilter g(2,9,0.20);
     vector<vector<Mat> > level(6);
     Mat m;
 	g.EstimateL0L1(9,9);
@@ -921,7 +920,7 @@ int main(int argc, char **argv)
         mLow=g.InvFilterL1(mLow);
         Mat s=( g.Filter(level[i][0],0)+ g.Filter(level[i][1],1)+g.Filter(level[i][2],2));
 //        Mat s=level[i][0]+level[i][1]+level[i][2];
-        mLow=(mLow+1.4*s);
+        mLow=(mLow+s);
         DisplayImage(mLow, "collapse");
     }
     //mLow = g.InvFilterL0(mLow);
@@ -934,6 +933,7 @@ int main(int argc, char **argv)
     absdiff(mu,mc,mu);
     minMaxIdx(mu,&minVal,&maxVal);
     cout << "error "<<minVal << "\t"<<maxVal<<endl;
+    imshow("Error",mu);
     imshow("Original",mc);
 
     waitKey();
