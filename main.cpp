@@ -9,6 +9,9 @@
 class SeparableSteerableFilter {
     std::vector<cv::Mat> fSepX,fSepY;
     std::vector<cv::Mat> hilbertX,hilbertY;
+    std::vector<cv::Mat> filterRes;
+    std::vector<cv::Mat> hilbertRes;
+    cv::Mat c1,c2,c3;
     std::vector<double> norme2fSepX;
     std::vector<double> norme2fSepY;
     cv::Point anchor;
@@ -120,6 +123,7 @@ public :
     double InterpolationFunction(int, double);
 	double InterpolationFunctionHilbert(int, double);
 	void     EstimateL0L1(int nbTap,int);
+    std::vector<cv::Mat> LocalOrientation(cv::Mat );
 
     void DisplayFilter();
 
@@ -674,7 +678,7 @@ vector<Mat> SeparableSteerableFilter::GetFilterHilbertXY(double angle)
 
     x=InterpolationFunctionHilbert(0,angle)*hilbertX[0];
     y=InterpolationFunctionHilbert(0,angle)*hilbertY[0];
-    for (int i = 1; i < fSepX.size(); i++)
+    for (int i = 1; i < hilbertX.size(); i++)
     {
         double k=InterpolationFunctionHilbert(i,angle);
         x = x +k*hilbertX[i];
@@ -687,6 +691,52 @@ vector<Mat> SeparableSteerableFilter::GetFilterHilbertXY(double angle)
 
 	return v;
 }
+
+vector<cv::Mat> SeparableSteerableFilter::LocalOrientation(cv::Mat m)
+{
+ 
+    filterRes.clear();
+    hilbertRes.clear();
+    if (derivativeOrder != 2)
+    {
+		cv::Exception e;
+		e.code = -2;
+		e.msg = "Local orientation supported for derivativeOrder=2 only!";
+    }
+    for (int i=0;i<fSepX.size();i++)
+    {
+        filterRes.push_back(Filter(m,i));
+    }
+    for (int i=0;i<hilbertX.size();i++)
+    {
+        hilbertRes.push_back(FilterHilbert(m,i));
+    }
+    Mat g2a2=filterRes[0].mul(filterRes[0]);
+    Mat g2b2=filterRes[1].mul(filterRes[1]);
+    Mat g2c2=filterRes[2].mul(filterRes[2]);
+    Mat h2a2=hilbertRes[0].mul(hilbertRes[0]);
+    Mat h2b2=hilbertRes[1].mul(hilbertRes[1]);
+    Mat h2c2=hilbertRes[2].mul(hilbertRes[2]);
+    Mat h2d2=hilbertRes[3].mul(hilbertRes[3]);
+    Mat h2ac=hilbertRes[0].mul(hilbertRes[2]);
+    Mat h2bd=hilbertRes[1].mul(hilbertRes[3]);
+
+    c1 = 0.5*g2b2 + 0.25*filterRes[0].mul(filterRes[2]);
+    c1 = c1 + 0.375*(g2a2+g2c2);
+    c1 = c1 + 0.3125*(h2a2+h2d2);
+    c1 = c1 + 0.5625*(h2b2+h2c2);
+    c1 = c1 + 0.375*(h2ac+h2bd);
+    c2 = 0.5*(g2a2 - g2c2) + 0.46875*(h2a2 - h2d2) + 0.28125*(h2b2-h2c2);
+    c2+=0.1875*(h2ac-h2bd);
+    c3 = -filterRes[0].mul(filterRes[1]) - filterRes[1].mul(filterRes[2]);
+    c3 += - 0.9375*(hilbertRes[2].mul(hilbertRes[3])+hilbertRes[0].mul(hilbertRes[1]));
+    c3 += - 1.6875*hilbertRes[1].mul(hilbertRes[2])-0.1875*hilbertRes[0].mul(hilbertRes[3]);
+    vector<Mat> r;
+    return r;
+}
+
+
+
 void DisplayImage(Mat x,string s)
 {
 	vector<Mat> sx;
@@ -876,10 +926,10 @@ int main(int argc, char **argv)
     Mat mc=imread("f:/lib/opencv/samples/data/lena.jpg",CV_LOAD_IMAGE_GRAYSCALE),dst1,dst2;
     double minValmc,maxValmc;
     minMaxIdx(mc,&minValmc,&maxValmc);
-    SeparableSteerableFilter g(2,9,0.20);
+    SeparableSteerableFilter g(2,11,0.20);
     vector<vector<Mat> > level(6);
     Mat m;
-	g.EstimateL0L1(9,9);
+	g.EstimateL0L1(11,11);
     g.DisplayFilter();
     mc.convertTo(m,CV_32F);
     double minVal,maxVal;
@@ -937,7 +987,6 @@ int main(int argc, char **argv)
     imshow("Original",mc);
 
     waitKey();
-    return 0;
     }
 
 
