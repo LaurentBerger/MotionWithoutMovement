@@ -692,9 +692,14 @@ vector<Mat> SeparableSteerableFilter::GetFilterHilbertXY(double angle)
 	return v;
 }
 
-vector<cv::Mat> SeparableSteerableFilter::LocalOrientation(cv::Mat m)
+vector<cv::Mat> SeparableSteerableFilter::LocalOrientation(cv::Mat mc)
 {
- 
+	Mat m;
+	if (L0().rows == 1)
+		sepFilter2D(m, m, CV_32F, g.L0(), g.L0());
+	else
+		filter2D(m, m, CV_32F, g.L0());
+
     filterRes.clear();
     hilbertRes.clear();
     if (derivativeOrder != 2)
@@ -731,8 +736,12 @@ vector<cv::Mat> SeparableSteerableFilter::LocalOrientation(cv::Mat m)
     c3 = -filterRes[0].mul(filterRes[1]) - filterRes[1].mul(filterRes[2]);
     c3 += - 0.9375*(hilbertRes[2].mul(hilbertRes[3])+hilbertRes[0].mul(hilbertRes[1]));
     c3 += - 1.6875*hilbertRes[1].mul(hilbertRes[2])-0.1875*hilbertRes[0].mul(hilbertRes[3]);
-    vector<Mat> r;
-    return r;
+
+	vector<Mat> r;
+	Mat modulus = c2.mul(c2) + c3.mul(c3);
+	sqrt(modulus, modulus);
+	r.push_back(modulus);
+	return r;
 }
 
 
@@ -923,17 +932,23 @@ void     SeparableSteerableFilter::EstimateL0L1(int nbTapL0,int nbTapL1)
 int main(int argc, char **argv)
 {
     {
-    Mat mc=imread("f:/lib/opencv/samples/data/lena.jpg",CV_LOAD_IMAGE_GRAYSCALE),dst1,dst2;
+    Mat mc=imread("c:/lib/opencv/samples/data/lena.jpg",CV_LOAD_IMAGE_GRAYSCALE),dst1,dst2;
     double minValmc,maxValmc;
     minMaxIdx(mc,&minValmc,&maxValmc);
     SeparableSteerableFilter g(2,11,0.20);
     vector<vector<Mat> > level(6);
     Mat m;
 	g.EstimateL0L1(11,11);
-    g.DisplayFilter();
     mc.convertTo(m,CV_32F);
     double minVal,maxVal;
     Mat mHigh,mLow;
+
+	vector<Mat> w = g.LocalOrientation(m);
+
+	DisplayImage(w[0], "LO");
+
+
+	g.DisplayFilter();
 
     minMaxIdx(m,&minVal,&maxVal);
     cout <<"Original "<< minVal << "\t"<<maxVal<<endl;
