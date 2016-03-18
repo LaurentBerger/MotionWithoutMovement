@@ -59,25 +59,23 @@
 
 */
 #define  _USE_MATH_DEFINES
+#include <opencv2/core.hpp>
+#include <opencv2/imgproc.hpp>
+#include <opencv2/highgui.hpp>
+#include "opencv2/opencv_modules.hpp"
 
-#include "NewParksMcClellan.h"
+#include "iirfilter.hpp"
 #include <iostream>
 //#include "Main.h"    // For the 2 message labels at the bottom of CalcParkCoeff2
 #define M_2PI  6.28318530717958647692
 
+namespace cv {
+    namespace fir_iirfilter {
 
-void ShowMessage(char *s)
-{
-    std::cout<<s<<std::endl;
-}
 //---------------------------------------------------------------------------
 
-int HalfTapCount, ExchangeIndex[PARKS_SMALL];
-double LeGrangeD[PARKS_SMALL], Alpha[PARKS_SMALL], CosOfGrid[PARKS_SMALL], DesPlus[PARKS_SMALL];
-double Coeff[PARKS_SMALL], Edge[PARKS_SMALL], BandMag[PARKS_SMALL], InitWeight[PARKS_SMALL];
-double DesiredMag[PARKS_BIG], Grid[PARKS_BIG], Weight[PARKS_BIG];
-
-void NewParksMcClellan(double *FirCoeff, int NumTaps, TFIRPassTypes PassType, double OmegaC, double BW, double ParksWidth, TWindowType WindowType, double WinBeta)
+// IIRfilter constructor using ParksMcClellan alogrithm 
+FIR_IIRFilter::FIR_IIRFilter(double *FirCoeff, int NumTaps, TFIRPassTypes PassType, double OmegaC, double BW, double ParksWidth, TWindowType WindowType, double WinBeta)
 {
  if(NumTaps > MAX_NUM_PARKS_TAPS)return;
  int j, NumBands;
@@ -183,7 +181,7 @@ void NewParksMcClellan(double *FirCoeff, int NumTaps, TFIRPassTypes PassType, do
 }
 //---------------------------------------------------------------------------
 
-void CalcParkCoeff2(int NumBands, int TapCount, double *FirCoeff)
+void FIR_IIRFilter::CalcParkCoeff2(int NumBands, int TapCount, double *FirCoeff)
 {
  int j, k, GridCount, GridIndex, BandIndex, NumIterations;
  double LowFreqEdge, UpperFreq, TempVar, Change;
@@ -238,7 +236,7 @@ void CalcParkCoeff2(int NumBands, int TapCount, double *FirCoeff)
  TempVar = (double)(GridIndex-1)/(double)HalfTapCount;
  for(j=1; j<=HalfTapCount; j++)
   {
-   ExchangeIndex[j] = (double)(j-1) * TempVar + 1.0;
+   ExchangeIndex[j] = static_cast<int>((double)(j-1) * TempVar + 1.0);
   }
  ExchangeIndex[HalfTapCount+1] = GridIndex;
 
@@ -287,7 +285,7 @@ void CalcParkCoeff2(int NumBands, int TapCount, double *FirCoeff)
 }
 
 //---------------------------------------------------------------------------------------
-int Remez2(int GridIndex)
+int FIR_IIRFilter::Remez2(int GridIndex)
 {
  int j, JET, K, k, NU, JCHNGE, K1, KNZ, KLOW, NUT, KUP;
  int NUT1, LUCK, KN, NITER;
@@ -502,7 +500,7 @@ int Remez2(int GridIndex)
 
 //-----------------------------------------------------------------------
 // Function to calculate the lagrange interpolation coefficients for use in the function gee.
-double LeGrangeInterp2(int K, int N, int M) // D
+double FIR_IIRFilter::LeGrangeInterp2(int K, int N, int M) // D
 {
  int j, k;
  double Dee, Q;
@@ -524,7 +522,7 @@ double LeGrangeInterp2(int K, int N, int M) // D
 //-----------------------------------------------------------------------
 // Function to evaluate the frequency response using the Lagrange interpolation
 // formula in the barycentric form.
-double GEE2(int K, int N)
+double FIR_IIRFilter::GEE2(int K, int N)
 {
  int j;
  double P,C,Dee,XF;
@@ -554,7 +552,7 @@ double GEE2(int K, int N)
 
 //-----------------------------------------------------------------------
 
-bool ErrTest(int k, int Nut, double Comp, double *Err)
+bool FIR_IIRFilter::ErrTest(int k, int Nut, double Comp, double *Err)
 {
  *Err = GEE2(k, HalfTapCount+1);
  *Err = (*Err - DesiredMag[k]) * Weight[k];
@@ -565,7 +563,7 @@ bool ErrTest(int k, int Nut, double Comp, double *Err)
 //-----------------------------------------------------------------------
 
 // Calculation of the coefficients of the best approximation using the inverse discrete fourier transform.
-void CalcCoefficients(void)
+void FIR_IIRFilter::CalcCoefficients(void)
 {
  int j, k, n;
  double GTempVar, OneOverNumTaps;
@@ -677,7 +675,7 @@ void CalcCoefficients(void)
  are the probably the best windows for general purpose signal analysis.
 */
 
-void WindowData(double *Data, int N, TWindowType WindowType, double Alpha, double Beta, bool UnityGain)
+void FIR_IIRFilter::WindowData(double *Data, int N, TWindowType WindowType, double Alpha, double Beta, bool UnityGain)
 {
  if(WindowType == wtNONE) return;
 
@@ -694,10 +692,13 @@ void WindowData(double *Data, int N, TWindowType WindowType, double Alpha, doubl
 
  WinCoeff  = new(std::nothrow) double[N+2];
  if(WinCoeff == NULL)
-  {
-   ShowMessage("Failed to allocate memory in WindowData() ");
-   return;
-  }
+    {
+    Exception e;
+    e.code = -2;
+    e.msg = "Failed to allocate memory in WindowData()";
+    throw e;
+    return;
+    }
 
  TopWidth = (int)( Alpha * (double)N );
  if(TopWidth%2 != 0)TopWidth++;
@@ -833,11 +834,13 @@ void WindowData(double *Data, int N, TWindowType WindowType, double Alpha, doubl
   }
 
  else // Error.
-  {
-   ShowMessage("Incorrect window type in WindowFFTData");
-   delete[] WinCoeff;
-   return;
-  }
+    {
+    cv::Exception e;
+    e.code = -2;
+    e.msg = "Incorrect window type in WindowFFTData";
+    delete[] WinCoeff;
+    throw e;
+    }
 
  // Fold the coefficients over.
  for(j=0; j<M/2; j++)WinCoeff[N-j-1] = WinCoeff[j];
@@ -868,7 +871,7 @@ void WindowData(double *Data, int N, TWindowType WindowType, double Alpha, doubl
 //---------------------------------------------------------------------------
 
 // This gets used with the Kaiser window.
-double Bessel(double x)
+double FIR_IIRFilter::Bessel(double x)
 {
  double Sum=0.0, XtoIpower;
  int i, j, Factorial;
@@ -882,23 +885,13 @@ double Bessel(double x)
  return(1.0 + Sum);
 }
 
-//-----------------------------------------------------------------------------
-
-// This gets used with the Sinc window.
-double SincBis(double x)
-{
- if(x > -1.0E-5 && x < 1.0E-5)return(1.0);
- return(sin(x)/x);
-}
-
-//---------------------------------------------------------------------------
 // This gets used in numerous places above.
-double Sinc(double x)
+double FIR_IIRFilter::Sinc(double x)
 {
  if(x > -1.0E-5 && x < 1.0E-5)return(1.0);
  return(sin(x)/x);
 }
 
 
-
-
+}
+}

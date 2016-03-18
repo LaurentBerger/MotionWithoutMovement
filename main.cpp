@@ -1,9 +1,13 @@
 #include "opencv2/opencv.hpp"
 #include <iostream>
+#include <strstream>
+#include <fstream>
+#include <iomanip>
 #include <algorithm>
 #define  _USE_MATH_DEFINES
-#include<math.h>
-#include "NewParksMcClellan.h"
+#include <math.h>
+#include "iirfilter.hpp"
+
 
 /* The design and use of steerable filters. IEEE Transactions on Pattern analysis and machine intelligence 13 (9). pp. 891–906.  */
 class SeparableSteerableFilter {
@@ -18,7 +22,9 @@ class SeparableSteerableFilter {
     int derivativeOrder;
 
     cv::Mat l0;
+    cv::Mat h0;
     cv::Mat l1;
+    cv::Mat h1;
     cv::Mat l0sym;
     cv::Mat l1sym;
     double l0CutoffFrequency;
@@ -109,12 +115,16 @@ public :
     SeparableSteerableFilter(int n,int height=9,double step=0.67);
     cv::Mat L0(){return l0;};
     cv::Mat L1(){return l1;};
+    cv::Mat H0(){return h0;};
+    cv::Mat H1(){return h1;};
     cv::Mat Filter(cv::Mat,double angle);
     cv::Mat Filter(cv::Mat,int );
     cv::Mat InvFilter(cv::Mat src,double angle);
     cv::Mat InvFilter(cv::Mat src,int  );
     cv::Mat InvFilterL0(cv::Mat src);
     cv::Mat FilterL1(cv::Mat src);
+    cv::Mat FilterH1(cv::Mat src);
+    cv::Mat InvFilterH1(cv::Mat src);
     cv::Mat InvFilterL1(cv::Mat src);
 
     cv::Mat FilterHilbert(cv::Mat,double angle);
@@ -133,27 +143,56 @@ public :
 using namespace std;
 using namespace cv;
 
+
+void DisplayImage(Mat x,string s)
+{
+	vector<Mat> sx;
+	split(x, sx);
+	vector<double> minVal(3), maxVal(3);
+	for (int i = 0; i < sx.size(); i++)
+	{
+		minMaxLoc(sx[i], &minVal[i], &maxVal[i]);
+
+	}
+	maxVal[0] = *max_element(maxVal.begin(), maxVal.end());
+	minVal[0] = *min_element(minVal.begin(), minVal.end());
+	Mat uc;
+	x.convertTo(uc, CV_8U,255/(maxVal[0]-minVal[0]),-255*minVal[0]/(maxVal[0]-minVal[0]));
+	imshow(s, uc);
+	waitKey(); 
+
+}
+
 void SeparableSteerableFilter::DisplayFilter()
 {
-    cout << "//The design and use of steerable filters. IEEE Transactions on Pattern analysis and machine intelligence 13 (9). pp. 891–906.  \n";
+    ostrstream s;
+    s << "//The design and use of steerable filters. IEEE Transactions on Pattern analysis and machine intelligence 13 (9). pp. 891–906.  \n";
     for (int i = 0; i < fSepX.size(); i++)
     {
-        cout << "//******************  Filter " << i << " ******************\n";
-        cout << "Gx"<<i<<"="<< fSepX[i]/norme2fSepX[i]<<endl;
-        cout << "Gy"<<i<<"="<< fSepY[i].t()/norme2fSepY[i]<<endl;
+        s << "//******************  Filter " << i << " ******************\n";
+        s << "Gx"<<i<<"="<< fSepX[i]/norme2fSepX[i]<<";"<<endl;
+        s << "Gy"<<i<<"="<< fSepY[i].t()/norme2fSepY[i]<<";"<<endl;
     }
-    cout << "\n//***********************************************************\n";
-    cout << "//****  QUADRATURE FILTER ***********\n";
+    s << "\n//***********************************************************\n";
+    s << "//****  QUADRATURE FILTER ***********\n";
     for (int i = 0; i < hilbertX.size(); i++)
     {
-        cout << "//******************  Filter " << i << " ******************\n";
-        cout << "Hx"<<i<<"="<< hilbertX[i]<<endl;
-        cout << "yFilter"<<i<<"="<< hilbertY[i].t()<<endl;
+        s << "//******************  Filter " << i << " ******************\n";
+        s << "Hx"<<i<<"="<< hilbertX[i]<<";"<<endl;
+        s << "yFilter"<<i<<"="<< hilbertY[i].t()<<";"<<endl;
     }
-    cout << "Frequency cut off " << this->l0CutoffFrequency << "\n";
-    cout << "L0="<<l0<<endl;;
-    cout << "Frequency cut off " << this->l1CutoffFrequency << "\n";
-	cout << "L1="<<l1<<endl;
+    s << "Frequency_cut_off= " << this->l0CutoffFrequency <<";"<< "\n";
+    s << "L0="<<l0<<";"<<endl;;
+    s << "H0="<<h0<<";"<<endl;;
+    s << "Frequency_cut_off= " << this->l1CutoffFrequency <<";"<< "\n";
+	s << "L1="<<l1<<";"<<endl;
+	s << "H1="<<h1<<";"<<endl;
+    string a(s.str(),s.pcount());
+    cout << a;
+    ofstream f("filter.sce");
+    f<<a;
+    f.flush();
+    s.freeze(false);
     waitKey();
 }
 
@@ -208,6 +247,7 @@ double SeparableSteerableFilter::InterpolationFunction(int n, double angle)
 		e.msg = "n must be less than polyOrder!";
 	}
 	}
+    return 0 ;
 }
 
 double SeparableSteerableFilter::InterpolationFunctionHilbert(int n, double angle)
@@ -265,12 +305,14 @@ double SeparableSteerableFilter::InterpolationFunctionHilbert(int n, double angl
 		e.msg = "n must be less than polyOrder!";
 	}
 	}
+return 0;
 }
 
 
 
-SeparableSteerableFilter::SeparableSteerableFilter(int n,int height,double step)
+SeparableSteerableFilter::SeparableSteerableFilter(int n,int height,double stepxy)
 {
+    float step=static_cast<float>(stepxy);
     if (n!=2 && n!=4)
 	{	
 		cv::Exception e;
@@ -297,7 +339,7 @@ SeparableSteerableFilter::SeparableSteerableFilter(int n,int height,double step)
             for (int j = 0; j < height; j++)
             {
                 float x=static_cast<float>(j-height/2)*step;
-                filter.at<float >(i,j)= G2a(x,y);
+                filter.at<float >(i,j)= static_cast<float>(G2a(x,y));
             }
         }
         SVD::compute(filter,s,u,v);
@@ -312,7 +354,7 @@ SeparableSteerableFilter::SeparableSteerableFilter(int n,int height,double step)
             for (int j = 0; j < height; j++)
             {
                 float x=static_cast<float>(j-height/2)*step;
-                filter.at<float >(i,j)= G2b(x,y);
+                filter.at<float >(i,j)= static_cast<float>(G2b(x,y));
             }
         }
         SVD::compute(filter,s,u,v);
@@ -326,7 +368,7 @@ SeparableSteerableFilter::SeparableSteerableFilter(int n,int height,double step)
             for (int j = 0; j < height; j++)
             {
                 float x=static_cast<float>(j-height/2)*step;
-                filter.at<float >(i,j)= G2c(x,y);
+                filter.at<float >(i,j)= static_cast<float>(G2c(x,y));
             }
         }
         SVD::compute(filter,s,u,v);
@@ -341,7 +383,7 @@ SeparableSteerableFilter::SeparableSteerableFilter(int n,int height,double step)
             for (int j = 0; j < height; j++)
             {
                 float x=static_cast<float>(j-height/2)*step;
-                filter.at<float >(i,j)= H2a(x,y);
+                filter.at<float >(i,j)= static_cast<float>(H2a(x,y));
             }
         }
         SVD::compute(filter,s,u,v);
@@ -353,7 +395,7 @@ SeparableSteerableFilter::SeparableSteerableFilter(int n,int height,double step)
             for (int j = 0; j < height; j++)
             {
                 float x=static_cast<float>(j-height/2)*step;
-                filter.at<float >(i,j)= H2b(x,y);
+                filter.at<float >(i,j)= static_cast<float>(H2b(x,y));
             }
         }
         SVD::compute(filter,s,u,v);
@@ -365,7 +407,7 @@ SeparableSteerableFilter::SeparableSteerableFilter(int n,int height,double step)
             for (int j = 0; j < height; j++)
             {
                 float x=static_cast<float>(j-height/2)*step;
-                filter.at<float >(i,j)= H2c(x,y);
+                filter.at<float >(i,j)= static_cast<float>(H2c(x,y));
             }
         }
         SVD::compute(filter,s,u,v);
@@ -377,7 +419,7 @@ SeparableSteerableFilter::SeparableSteerableFilter(int n,int height,double step)
             for (int j = 0; j < height; j++)
             {
                 float x=static_cast<float>(j-height/2)*step;
-                filter.at<float >(i,j)= H2d(x,y);
+                filter.at<float >(i,j)= static_cast<float>(H2d(x,y));
             }
         }
         SVD::compute(filter,s,u,v);
@@ -391,7 +433,7 @@ SeparableSteerableFilter::SeparableSteerableFilter(int n,int height,double step)
             for (int j = 0; j < height; j++)
             {
                 float x=static_cast<float>(j-height/2)*step;
-                filter.at<float >(i,j)= G4a(x,y);
+                filter.at<float >(i,j)= static_cast<float>(G4a(x,y));
             }
         }
         SVD::compute(filter,s,u,v);
@@ -405,7 +447,7 @@ SeparableSteerableFilter::SeparableSteerableFilter(int n,int height,double step)
             for (int j = 0; j < height; j++)
             {
                 float x=static_cast<float>(j-height/2)*step;
-                filter.at<float >(i,j)= G4b(x,y);
+                filter.at<float >(i,j)= static_cast<float>(G4b(x,y));
             }
         }
         SVD::compute(filter,s,u,v);
@@ -419,7 +461,7 @@ SeparableSteerableFilter::SeparableSteerableFilter(int n,int height,double step)
             for (int j = 0; j < height; j++)
             {
                 float x=static_cast<float>(j-height/2)*step;
-                filter.at<float >(i,j)= G4c(x,y);
+                filter.at<float >(i,j)= static_cast<float>(G4c(x,y));
             }
         }
         SVD::compute(filter,s,u,v);
@@ -433,7 +475,7 @@ SeparableSteerableFilter::SeparableSteerableFilter(int n,int height,double step)
             for (int j = 0; j < height; j++)
             {
                 float x=static_cast<float>(j-height/2)*step;
-                filter.at<float >(i,j)= G4d(x,y);
+                filter.at<float >(i,j)= static_cast<float>(G4d(x,y));
             }
         }
         SVD::compute(filter,s,u,v);
@@ -447,7 +489,7 @@ SeparableSteerableFilter::SeparableSteerableFilter(int n,int height,double step)
             for (int j = 0; j < height; j++)
             {
                 float x=static_cast<float>(j-height/2)*step;
-                filter.at<float >(i,j)= G4e(x,y);
+                filter.at<float >(i,j)= static_cast<float>(G4e(x,y));
             }
         }
         SVD::compute(filter,s,u,v);
@@ -462,7 +504,7 @@ SeparableSteerableFilter::SeparableSteerableFilter(int n,int height,double step)
             for (int j = 0; j < height; j++)
             {
                 float x=static_cast<float>(j-height/2)*step;
-                filter.at<float >(i,j)= H4a(x,y);
+                filter.at<float >(i,j)= static_cast<float>(H4a(x,y));
             }
         }
         SVD::compute(filter,s,u,v);
@@ -474,7 +516,7 @@ SeparableSteerableFilter::SeparableSteerableFilter(int n,int height,double step)
             for (int j = 0; j < height; j++)
             {
                 float x=static_cast<float>(j-height/2)*step;
-                filter.at<float >(i,j)= H4b(x,y);
+                filter.at<float >(i,j)= static_cast<float>(H4b(x,y));
             }
         }
         SVD::compute(filter,s,u,v);
@@ -486,7 +528,7 @@ SeparableSteerableFilter::SeparableSteerableFilter(int n,int height,double step)
             for (int j = 0; j < height; j++)
             {
                 float x=static_cast<float>(j-height/2)*step;
-                filter.at<float >(i,j)= H4c(x,y);
+                filter.at<float >(i,j)= static_cast<float>(H4c(x,y));
             }
         }
         SVD::compute(filter,s,u,v);
@@ -498,7 +540,7 @@ SeparableSteerableFilter::SeparableSteerableFilter(int n,int height,double step)
             for (int j = 0; j < height; j++)
             {
                 float x=static_cast<float>(j-height/2)*step;
-                filter.at<float >(i,j)= H4d(x,y);
+                filter.at<float >(i,j)= static_cast<float>(H4d(x,y));
             }
         }
         SVD::compute(filter,s,u,v);
@@ -510,7 +552,7 @@ SeparableSteerableFilter::SeparableSteerableFilter(int n,int height,double step)
             for (int j = 0; j < height; j++)
             {
                 float x=static_cast<float>(j-height/2)*step;
-                filter.at<float >(i,j)= H4e(x,y);
+                filter.at<float >(i,j)= static_cast<float>(H4e(x,y));
             }
         }
         SVD::compute(filter,s,u,v);
@@ -522,7 +564,7 @@ SeparableSteerableFilter::SeparableSteerableFilter(int n,int height,double step)
             for (int j = 0; j < height; j++)
             {
                 float x=static_cast<float>(j-height/2)*step;
-                filter.at<float >(i,j)= H4f(x,y);
+                filter.at<float >(i,j)= static_cast<float>(H4f(x,y));
             }
         }
         SVD::compute(filter,s,u,v);
@@ -578,8 +620,7 @@ Mat SeparableSteerableFilter::FilterL1(Mat src)
 
     if (l1.rows==1)
     {
-        flip(l1,iv0,1);
-        sepFilter2D(src,f,CV_32F,iv0,iv0);
+        sepFilter2D(src,f,CV_32F,l1,l1);
     }
     else
     {
@@ -589,6 +630,46 @@ Mat SeparableSteerableFilter::FilterL1(Mat src)
 
 
 }
+
+
+Mat SeparableSteerableFilter::InvFilterH1(Mat src)
+{
+    Mat f,iv0;
+
+    if (h1.rows==1)
+    {
+        flip(h1,iv0,1);
+        sepFilter2D(src,f,CV_32F,iv0,iv0);
+    }
+    else
+    {
+        filter2D(src,f,CV_32F,h1);
+    }
+    return f;
+
+
+}
+
+
+Mat SeparableSteerableFilter::FilterH1(Mat src)
+{
+    Mat f,iv0;
+
+    if (h1.rows==1)
+    {
+        flip(l1,iv0,1);
+        sepFilter2D(src,f,CV_32F,iv0,iv0);
+    }
+    else
+    {
+        filter2D(src,f,CV_32F,h1);
+    }
+    return f;
+
+
+}
+
+
 
 
 /* http://web.cs.hacettepe.edu.tr/~aykut/classes/spring2014/bsb663/slides/w08-pyramids.pdf */
@@ -634,7 +715,7 @@ Mat SeparableSteerableFilter::Filter(Mat src,int i)
 {
     Mat f;
 
-    sepFilter2D(src,f,CV_32F,fSepX[i]/norme2fSepX[i],fSepY[i]/norme2fSepY[i],anchor);
+    sepFilter2D(src,f,CV_32F,fSepX[i]/norme2fSepX[i],fSepY[i].t()/norme2fSepY[i]);
     return f;
 
 
@@ -694,12 +775,23 @@ vector<Mat> SeparableSteerableFilter::GetFilterHilbertXY(double angle)
 
 vector<cv::Mat> SeparableSteerableFilter::LocalOrientation(cv::Mat mc)
 {
-	Mat m;
+	Mat m,m1;
 	if (L0().rows == 1)
-		sepFilter2D(m, m, CV_32F, g.L0(), g.L0());
+		sepFilter2D(mc, m1, CV_32F,L0(), L0());
 	else
-		filter2D(m, m, CV_32F, g.L0());
-
+		filter2D(mc, m1, CV_32F, L0());
+    DisplayImage(m1, "L0 filter");
+	if (L1().rows == 1)
+		sepFilter2D(m1, m, CV_32F,L1(), L1());
+	else
+		filter2D(m1, m, CV_32F, L1());
+    DisplayImage(m, "L1*L0 filter");
+ 	if (h1.rows == 1)
+		sepFilter2D(m1, m, CV_32F,h1, h1);
+	else
+		filter2D(m1, m, CV_32F,h1);
+    //m=m1-m;
+    DisplayImage(m, "BP(L1*L0) filter");
     filterRes.clear();
     hilbertRes.clear();
     if (derivativeOrder != 2)
@@ -711,6 +803,7 @@ vector<cv::Mat> SeparableSteerableFilter::LocalOrientation(cv::Mat mc)
     for (int i=0;i<fSepX.size();i++)
     {
         filterRes.push_back(Filter(m,i));
+        DisplayImage(filterRes[i], format("g2%d",i));
     }
     for (int i=0;i<hilbertX.size();i++)
     {
@@ -746,24 +839,6 @@ vector<cv::Mat> SeparableSteerableFilter::LocalOrientation(cv::Mat mc)
 
 
 
-void DisplayImage(Mat x,string s)
-{
-	vector<Mat> sx;
-	split(x, sx);
-	vector<double> minVal(3), maxVal(3);
-	for (int i = 0; i < sx.size(); i++)
-	{
-		minMaxLoc(sx[i], &minVal[i], &maxVal[i]);
-
-	}
-	maxVal[0] = *max_element(maxVal.begin(), maxVal.end());
-	minVal[0] = *min_element(minVal.begin(), minVal.end());
-	Mat uc;
-	x.convertTo(uc, CV_8U,255/(maxVal[0]-minVal[0]),-255*minVal[0]/(maxVal[0]-minVal[0]));
-	imshow(s, uc);
-	waitKey(); 
-
-}
 
 void     SeparableSteerableFilter::EstimateL0L1(int nbTapL0,int nbTapL1)
 {
@@ -795,7 +870,7 @@ void     SeparableSteerableFilter::EstimateL0L1(int nbTapL0,int nbTapL1)
     if (maxPos.x>m.cols/2)
         maxPos.x=m.cols-maxPos.x;
 	Mat bp;
-	bp = m > maxVal /2;
+	bp = m > maxVal /1.5;
     // low frequency cut off
     i=maxPos.x;
     while (i >= 0 && bp.at<uchar>(0,i)==255)
@@ -806,7 +881,7 @@ void     SeparableSteerableFilter::EstimateL0L1(int nbTapL0,int nbTapL1)
 		e.code = -3;
 		e.msg = "Cannot find low pass filter L1!";
 	}
-    l1CutoffFrequency=static_cast<double>(i)/bp.cols;
+    l1CutoffFrequency=static_cast<float>(i)/bp.cols;
     i=maxPos.x;
     while (i <bp.cols/2 && bp.at<uchar>(0,i)==255)
         i++;
@@ -816,133 +891,87 @@ void     SeparableSteerableFilter::EstimateL0L1(int nbTapL0,int nbTapL1)
 		e.code = -3;
 		e.msg = "Cannot find low pass filter L0!";
 	}
-    l0CutoffFrequency=static_cast<double>(i)/bp.cols;
-    double *firCoef=new double[max(nbTapL0,nbTapL1)];
-    TFIRPassTypes passType=firLPF;
+    l0CutoffFrequency=static_cast<float>(i)/bp.cols;
+    vector<double> firCoefL0(nbTapL0);
+    cv::fir_iirfilter::TFIRPassTypes passType=cv::fir_iirfilter::firLPF;
     double omegac=l0CutoffFrequency;
     double bw=0;
     double parksWidth=0.1;
-    TWindowType windowType=wtHANNING;
+    cv::fir_iirfilter::TWindowType windowType=cv::fir_iirfilter::wtKAISER;
 
-    NewParksMcClellan(firCoef, nbTapL0, passType, omegac*2, bw, parksWidth, windowType, 0);
-    l0 = Mat::zeros(1,nbTapL0,CV_32FC1);
- 
-    for (int i=0;i<nbTapL0;i++)
-        l0.at<float>(0, i) = firCoef[i];
-    cout<< "l0="<<l0<<endl;
-    l0 = Mat::zeros(nbTapL0,nbTapL0,CV_32FC1);
-    for (int i=0;i<nbTapL0;i++)
-        for (int j = 0; j < nbTapL0; j++)
-        {
-            int d = sqrt((i-nbTapL0/2)*(i-nbTapL0/2)+(j-nbTapL0/2)*(j-nbTapL0/2));
-            if (d>nbTapL0/2)
-                l0.at<float>(i, j) = 0;
-            else
-                l0.at<float>(i, j) = firCoef[d+nbTapL0/2];
 
-        }
+    cv::fir_iirfilter::FIR_IIRFilter f(firCoefL0.data(), nbTapL0, passType, omegac*2, bw,  1./nbTapL0, windowType, 2.41);
+    Mat l01d = Mat(firCoefL0);
+    l01d = l01d / sum(l01d)[0];
+    vector<double> al = {-0.5,0.5,0.5, 0.25, 0.25};
+    vector<double> ah = {-0.5,0.5,0.5, 0.25, 0.25};
+
+    Mat h00d = f.UnitaryFilter(l01d);
+    l0= f.McClellanTransform(l01d,al);
+    h0= f.McClellanTransform(h00d,ah);
+    cout<< "l0="<<l01d<<endl;
+    cout<< "h0="<<h00d<<endl;
 
     omegac=l1CutoffFrequency;
-    NewParksMcClellan(firCoef, nbTapL1, passType, omegac*2, bw, parksWidth, windowType, 0);
-    l1 = Mat::zeros(1,nbTapL1,CV_32FC1);
-    for (int i=0;i<nbTapL1;i++)
-        l1.at<float>(0, i) = firCoef[i];
-    l1 = Mat::zeros(nbTapL1,nbTapL1,CV_32FC1);
-    for (int i=0;i<nbTapL1;i++)
-        for (int j = 0; j < nbTapL1; j++)
-        {
-            int d = sqrt((i-nbTapL1/2)*(i-nbTapL1/2)+(j-nbTapL1/2)*(j-nbTapL1/2));
-            if (d>nbTapL1/2)
-                l1.at<float>(i, j) = 0;
-            else
-                l1.at<float>(i, j) = firCoef[d+nbTapL1/2];
-
-        }
-    delete firCoef;
-// Analyse spectrale du système
-    vector<Mat> kernel;
-    if (l0.rows==1)
-        kernel.push_back(l0.t()* l0);
-    else
-        kernel.push_back(l0);
-    if (l1.rows==1)
-        kernel.push_back(l1.t()* l1);
-    else
-        kernel.push_back(l1);
-    for (int i = 0; i<fSepX.size();i++)
-        kernel.push_back(fSepX[i].t()* fSepY[i].t());
-    vector<Mat> spectre;
-    spectre.resize(kernel.size());
-    Mat response;
-    for (int i = 0; i < kernel.size(); i++)
-    {
-	    Mat x = Mat::zeros(256, 256, CV_32F);
-	    Mat y = Mat::zeros(256, 256, CV_32F);
-	    Mat z;
-
-	    Rect r(0, 0, kernel[i].cols, kernel[i].rows);
-	    kernel[i].copyTo(x(r));
-    FileStorage fs(format("kernel%d.yml",i), FileStorage::WRITE);
-
-    fs << "Image" << kernel[i];
-        vector<Mat> cplxPlane = {x,y};
-        merge(cplxPlane,z);
-        dft(z,spectre[i]);
-        vector<Mat> p;
-	    split(spectre[i],p);
-	    Mat m;
-	    magnitude(p[0],p[1],m);
-	    minMaxLoc(m, &minVal, &maxVal,&minPos,&maxPos);
-        cout << "spectrum "<<i<<"="<<minVal << " " << maxVal << "\n";
-        
-        if (i > 0)
-        {
-            if (i>=2)
-            {
-                norme2fSepX[i-2]=sqrt(maxVal);
-                norme2fSepY[i-2]=sqrt(maxVal);
-            }
-            if (i == 1)
-            {
-
-                l1=l1/maxVal;
-                m = m/maxVal;
-            }
-            if (response.empty())
-                response=m;
-            else
-                response+=m/maxVal;
-
-        }
-        else
-            l0=l0/maxVal;
-        DisplayImage(m,format("Full spectrum %d",i));
-
-    }
-    FileStorage fs("fullSpectrume.yml", FileStorage::WRITE);
-
-    fs << "Image" << response;
-    minMaxLoc(response, &minVal, &maxVal,&minPos,&maxPos);
-    cout << "Full spectrum "<<minVal << " " << maxVal << "\n";
-    DisplayImage(response,"Full spectrum ");
+    vector<double> firCoefL1(nbTapL1);
+    cv::fir_iirfilter::FIR_IIRFilter(firCoefL1.data(), nbTapL1, passType, omegac*2, bw, .1/nbTapL1, windowType, 2.41);
+    Mat h11d;
+    Mat l11d = Mat(firCoefL1);
+    l11d = l11d / sum(l11d)[0];
+   h11d = f.UnitaryFilter(l11d);
+    l1=f.McClellanTransform(l11d,al);
+    h1=f.McClellanTransform(h11d,ah);
+    cout << h1 << "\n";
 
 }
 
 
+
 int main(int argc, char **argv)
 {
+ 
+
+    
+    
     {
-    Mat mc=imread("c:/lib/opencv/samples/data/lena.jpg",CV_LOAD_IMAGE_GRAYSCALE),dst1,dst2;
+    Mat mc=imread("f:/lib/einstein.pgm",CV_LOAD_IMAGE_GRAYSCALE),dst1,dst2;
+/*    mc = Mat::zeros(512,512,CV_8SC1);
+    for (int i = 0; i < 512; i++)
+    {
+        uchar *uc = mc.ptr(i);
+        for (int j = 0; j < 512; j++,uc++)
+        {
+            double d = (i - 256)*(i - 256) + (j-256)*(j-256);
+            d = sqrt(d)/1;
+            if (d==0)
+                *uc=127;
+            else
+                *uc = static_cast<uchar>(sin(d)/d*127);
+        }
+    }*/
     double minValmc,maxValmc;
     minMaxIdx(mc,&minValmc,&maxValmc);
-    SeparableSteerableFilter g(2,11,0.20);
+    int order=2;
+    SeparableSteerableFilter g(order,9,0.67);
     vector<vector<Mat> > level(6);
     Mat m;
 	g.EstimateL0L1(11,11);
+
+
+
+	g.DisplayFilter();
     mc.convertTo(m,CV_32F);
+    Mat mcH;
+    mcH = g.InvFilterH1(g.FilterH1(m))+g.InvFilterL1(g.FilterL1(m));
+
+    DisplayImage(m, "original");
+    DisplayImage(mcH, "original g");
     double minVal,maxVal;
     Mat mHigh,mLow;
-
+    for (int i=0;i<=order;i++)
+    {
+        DisplayImage(g.Filter(m,i), format("g2%d",i));
+    }
 	vector<Mat> w = g.LocalOrientation(m);
 
 	DisplayImage(w[0], "LO");
@@ -963,7 +992,7 @@ int main(int argc, char **argv)
     {
         Mat mH,mL;
         mL=g.FilterL1(mLow);
-        mH=mLow-mL;
+        mH=g.FilterH1(mLow);
         level[i].push_back(g.InvFilter(mH,0));
         level[i].push_back(g.InvFilter(mH,1));
         level[i].push_back(g.InvFilter(mH,2));
@@ -976,7 +1005,7 @@ int main(int argc, char **argv)
     }
     minMaxIdx(mLow,&minVal,&maxVal);
     cout << minVal << "\t"<<maxVal<<endl;
-    for (int i =  level.size()-1; i >=0 ; i--)
+    for (int i =  static_cast<int>(level.size())-1; i >=0 ; i--)
     {
         minMaxIdx(mLow,&minVal,&maxVal);
         cout << "Level "<<i<<"\t"<<minVal << "\t"<<maxVal<<endl;
@@ -985,7 +1014,7 @@ int main(int argc, char **argv)
         mLow=g.InvFilterL1(mLow);
         Mat s=( g.Filter(level[i][0],0)+ g.Filter(level[i][1],1)+g.Filter(level[i][2],2));
 //        Mat s=level[i][0]+level[i][1]+level[i][2];
-        mLow=(mLow+s);
+        mLow=(mLow+g.InvFilterH1(s));
         DisplayImage(mLow, "collapse");
     }
     //mLow = g.InvFilterL0(mLow);

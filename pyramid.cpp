@@ -1,4 +1,9 @@
-#include "precomp.hpp"
+#include <opencv2/core.hpp>
+#include <opencv2/imgproc.hpp>
+#include <opencv2/highgui.hpp>
+#include "opencv2/opencv_modules.hpp"
+#include "iirfilter.hpp"
+#include "pyramid.hpp"
 
 using namespace std;
 namespace cv
@@ -30,7 +35,7 @@ Pyramid::Pyramid(Pyramid const &p)
 #define MIN_ROW_COL_PYRAMID 32
 Mat Pyramid::collapse()
 {
-    cv::Exception e;
+    Exception e;
 	e.code = -2;
 	e.msg = "Not implemented for base class";
 	throw e;
