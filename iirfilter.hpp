@@ -106,6 +106,7 @@ public :
 
     Mat McClellanTransform(Mat fir1d,std::vector<double> abcde,int nbPts=256);
     Mat UnitaryFilter(Mat l);
+    std::vector<Mat> OptimizeUnitaryFilter(double cufoffFrequency,int nbTap);
 
 };
 }

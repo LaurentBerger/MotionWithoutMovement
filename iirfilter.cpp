@@ -113,8 +113,8 @@ namespace fir_iirfilter {
         dft(h11d.t(),H11d, DFT_COMPLEX_OUTPUT);
         Mat H;
         complex<double> *z = (complex<double>*) H11d.ptr(0);
-        *z++ =0;
-        for (int i = 1; i < nbTapL1; i++, z++)
+        //*z++ =0;
+        for (int i = 0; i < nbTapL1; i++, z++)
         {
             *z=sqrt(complex<double> (1,0) - (*z) * (*z));
             z->imag(0);
@@ -122,7 +122,7 @@ namespace fir_iirfilter {
                 *z/=abs(*z);
         }
     
-        idft(H11d,h11d,DFT_REAL_OUTPUT|DFT_SCALE);
+        idft(H11d,h11d,DFT_REAL_OUTPUT|DFT_SCALE|DFT_ROWS);
         Mat h1 = Mat::zeros(nbTapL1,1,CV_64FC1);
         for (int i=0;i<=nbTapL1/2;i++)
             h1.at<double>(nbTapL1/2+i,0)=h11d.at<double>(0,i);
@@ -130,6 +130,89 @@ namespace fir_iirfilter {
             h1.at<double>(i, 0) = h11d.at<double>(0,nbTapL1/2+1+i);
         cout << "hhh1 = "<<h1 << "\n";
         return h1;
+    }
+
+    vector<Mat> FIR_IIRFilter::OptimizeUnitaryFilter(double cufoffFrequency,int nbTap)
+    {
+        int N=getOptimalDFTSize(nbTap*16) ;
+        N=256;
+        Mat idealLow=Mat::zeros(1,N,CV_32FC2);
+        Mat idealHigh;
+        int kCutoff = static_cast<int>(N*cufoffFrequency);
+        complex<float> *z=(complex<float> *)idealLow.ptr(0);;
+        for (int i=0;i<kCutoff;i++,z++)
+            *z = complex<float>(1,0);
+        z=(complex<float> *)idealLow.ptr(0);
+        z += N-kCutoff+1;
+        for (int i=N-kCutoff+1;i<N;i++,z++)
+            *z = complex<float>(1,0);
+        Rect r(N-kCutoff+1,0,kCutoff-1,1);
+        idealHigh=1-idealLow;
+        cout<<idealLow<<endl;
+        cout<<idealHigh<<endl;
+
+        Mat hl,hh;
+
+        dft(idealLow,hl,DFT_REAL_OUTPUT|DFT_SCALE|DFT_INVERSE);
+        Mat Hl;
+        for (int iter = 0; iter < 1000; iter++)
+        {
+            Rect r(nbTap/2+1,0,N-nbTap,1);
+            hl(r)=0;
+            dft(hl,Hl,DFT_COMPLEX_OUTPUT);
+            complex<float> *z = (complex<float> *)Hl.ptr(0);
+            complex<float> *zref = (complex<float> *)idealLow.ptr(0);
+            for (int i = 0; i < N; i++, z++,zref++)
+            {
+                if (abs(*z)>1)
+                    *z = complex<float>(1,0);
+                if (zref->real()==1)
+                    *z = complex<float>(1,0);
+            }
+            dft(Hl,hl,DFT_REAL_OUTPUT|DFT_SCALE|DFT_INVERSE);
+           
+        }
+        Mat Hh;
+        Hl.copyTo(Hh);
+        z = (complex<float> *)Hl.ptr(0);
+        complex<float> *zh = (complex<float> *)Hh.ptr(0);
+        complex<float> *zref = (complex<float> *)idealLow.ptr(0);
+        for (int i = 0; i < N; i++, z++,zref++,zh++)
+        {
+            if (abs(*z)>1)
+                *z = complex<float>(1,0);
+            if (zref->real()==1)
+                *z = complex<float>(1,0);
+            *zh = sqrt(1 - z->real()*z->real()-z->imag()*z->imag());
+            if (zref->real()==1)
+                *zh = *zh / complex<float>(2,0);
+        }
+        dft(Hl,hl,DFT_REAL_OUTPUT|DFT_SCALE|DFT_INVERSE);
+        dft(Hh,hh,DFT_REAL_OUTPUT|DFT_SCALE|DFT_INVERSE);
+        Mat h1 = Mat::zeros(1,nbTap,CV_64FC1);
+        Mat h2 = Mat::zeros(1,nbTap,CV_64FC1);
+        double *d1 = (double*)h1.ptr(0)+nbTap / 2 ;
+        double *d2 = (double*)h2.ptr(0)+nbTap / 2 ;
+        for (int i = 0; i <= nbTap / 2 ; i++,d1++,d2++)
+        {
+            *d1 = hl.at<float>(0,i);
+            *d2 = hh.at<float>(0,i);
+        }
+        d1 = (double*)h1.ptr(0);
+        d2 = (double*)h2.ptr(0);
+        for (int i = 0; i < nbTap / 2 ; i++,d1++,d2++)
+        {
+            *d1 = hl.at<float>(0,N-nbTap / 2+i);
+            *d2 = hh.at<float>(0,N-nbTap / 2+i);
+        }
+
+
+        cout<<h1<<endl;
+        cout<<h2<<endl;
+        vector<Mat> p;
+        p.push_back(h1);
+        p.push_back(h2);
+        return p;
     }
 
 

@@ -901,26 +901,24 @@ void     SeparableSteerableFilter::EstimateL0L1(int nbTapL0,int nbTapL1)
 
 
     cv::fir_iirfilter::FIR_IIRFilter f(firCoefL0.data(), nbTapL0, passType, omegac*2, bw,  1./nbTapL0, windowType, 2.41);
+    vector<Mat> pp = f.OptimizeUnitaryFilter(l0CutoffFrequency,9);
     Mat l01d = Mat(firCoefL0);
     l01d = l01d / sum(l01d)[0];
     vector<double> al = {-0.5,0.5,0.5, 0.25, 0.25};
     vector<double> ah = {-0.5,0.5,0.5, 0.25, 0.25};
-
-    Mat h00d = f.UnitaryFilter(l01d);
-    l0= f.McClellanTransform(l01d,al);
-    h0= f.McClellanTransform(h00d,ah);
-    cout<< "l0="<<l01d<<endl;
-    cout<< "h0="<<h00d<<endl;
+    cout<<"l0="<<pp[0]<<endl;
+    cout<<"h0="<<pp[1]<<endl;
+    l0= f.McClellanTransform(pp[0].t(),al);
+    h0= f.McClellanTransform(pp[1].t(),ah);
 
     omegac=l1CutoffFrequency;
-    vector<double> firCoefL1(nbTapL1);
-    cv::fir_iirfilter::FIR_IIRFilter(firCoefL1.data(), nbTapL1, passType, omegac*2, bw, .1/nbTapL1, windowType, 2.41);
-    Mat h11d;
-    Mat l11d = Mat(firCoefL1);
-    l11d = l11d / sum(l11d)[0];
-   h11d = f.UnitaryFilter(l11d);
-    l1=f.McClellanTransform(l11d,al);
-    h1=f.McClellanTransform(h11d,ah);
+    cout<<"l0="<<pp[0]<<endl;
+    cout<<"h0="<<pp[1]<<endl;
+    pp = f.OptimizeUnitaryFilter(l1CutoffFrequency,9);
+    cout<<"l1="<<pp[0]<<endl;
+    cout<<"h1="<<pp[1]<<endl;
+    l1=f.McClellanTransform(pp[0].t(),al);
+    h1=f.McClellanTransform(pp[1].t(),ah);
     cout << h1 << "\n";
 
 }
@@ -934,7 +932,8 @@ int main(int argc, char **argv)
     
     
     {
-    Mat mc=imread("f:/lib/einstein.pgm",CV_LOAD_IMAGE_GRAYSCALE),dst1,dst2;
+//    Mat mc=imread("f:/lib/einstein.pgm",CV_LOAD_IMAGE_GRAYSCALE),dst1,dst2;
+    Mat mc=imread("f:/lib/opencv/samples/data/lena.jpg",CV_LOAD_IMAGE_GRAYSCALE);
 /*    mc = Mat::zeros(512,512,CV_8SC1);
     for (int i = 0; i < 512; i++)
     {
@@ -955,7 +954,7 @@ int main(int argc, char **argv)
     SeparableSteerableFilter g(order,9,0.67);
     vector<vector<Mat> > level(6);
     Mat m;
-	g.EstimateL0L1(11,11);
+	g.EstimateL0L1(9,9);
 
 
 
@@ -963,10 +962,15 @@ int main(int argc, char **argv)
     mc.convertTo(m,CV_32F);
     Mat mcH;
     mcH = g.InvFilterH1(g.FilterH1(m))+g.InvFilterL1(g.FilterL1(m));
-
+    Mat me;
+    mcH.convertTo(me,CV_8U);
     DisplayImage(m, "original");
     DisplayImage(mcH, "original g");
+    cout << "PSNR = " << PSNR(mc,me)<<"\n";
     double minVal,maxVal;
+    absdiff(m,mcH,m);
+    minMaxIdx(m,&minVal,&maxVal);
+    cout << minVal << " "<<maxVal<<" "<<mean(m)[0]<<endl;
     Mat mHigh,mLow;
     for (int i=0;i<=order;i++)
     {
