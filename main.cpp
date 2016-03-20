@@ -901,7 +901,7 @@ void     SeparableSteerableFilter::EstimateL0L1(int nbTapL0,int nbTapL1)
 
 
     cv::fir_iirfilter::FIR_IIRFilter f(firCoefL0.data(), nbTapL0, passType, omegac*2, bw,  1./nbTapL0, windowType, 2.41);
-    vector<Mat> pp = f.OptimizeUnitaryFilter(l0CutoffFrequency,9);
+    vector<Mat> pp = f.OptimizeUnitaryFilter(l0CutoffFrequency,11);
     Mat l01d = Mat(firCoefL0);
     l01d = l01d / sum(l01d)[0];
     vector<double> al = {-0.5,0.5,0.5, 0.25, 0.25};
@@ -914,7 +914,7 @@ void     SeparableSteerableFilter::EstimateL0L1(int nbTapL0,int nbTapL1)
     omegac=l1CutoffFrequency;
     cout<<"l0="<<pp[0]<<endl;
     cout<<"h0="<<pp[1]<<endl;
-    pp = f.OptimizeUnitaryFilter(l1CutoffFrequency,9);
+    pp = f.OptimizeUnitaryFilter(l1CutoffFrequency,11);
     cout<<"l1="<<pp[0]<<endl;
     cout<<"h1="<<pp[1]<<endl;
     l1=f.McClellanTransform(pp[0].t(),al);

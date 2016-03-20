@@ -186,6 +186,10 @@ namespace fir_iirfilter {
             *zh = sqrt(1 - z->real()*z->real()-z->imag()*z->imag());
             if (zref->real()==1)
                 *zh = *zh / complex<float>(2,0);
+/*            if (i>=N/2)
+                *zh = -complex<float>(0,1)* *zh;
+            else if (i!=0)
+                *zh = complex<float>(0,1)* *zh;*/
         }
         dft(Hl,hl,DFT_REAL_OUTPUT|DFT_SCALE|DFT_INVERSE);
         dft(Hh,hh,DFT_REAL_OUTPUT|DFT_SCALE|DFT_INVERSE);
