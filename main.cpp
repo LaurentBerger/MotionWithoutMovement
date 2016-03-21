@@ -121,9 +121,12 @@ public :
     cv::Mat Filter(cv::Mat,int );
     cv::Mat InvFilter(cv::Mat src,double angle);
     cv::Mat InvFilter(cv::Mat src,int  );
-    cv::Mat InvFilterL0(cv::Mat src);
     cv::Mat FilterL1(cv::Mat src);
     cv::Mat FilterH1(cv::Mat src);
+    cv::Mat FilterL0(cv::Mat src);
+    cv::Mat InvFilterL0(cv::Mat src);
+    cv::Mat FilterH0(cv::Mat src);
+    cv::Mat InvFilterH0(cv::Mat src);
     cv::Mat InvFilterH1(cv::Mat src);
     cv::Mat InvFilterL1(cv::Mat src);
 
@@ -342,6 +345,7 @@ SeparableSteerableFilter::SeparableSteerableFilter(int n,int height,double stepx
                 filter.at<float >(i,j)= static_cast<float>(G2a(x,y));
             }
         }
+        cout << "G0="<<filter<<endl;
         SVD::compute(filter,s,u,v);
 
         fSepY.push_back(u.col(0)/u.at<float>(height/2,0));
@@ -357,6 +361,7 @@ SeparableSteerableFilter::SeparableSteerableFilter(int n,int height,double stepx
                 filter.at<float >(i,j)= static_cast<float>(G2b(x,y));
             }
         }
+        cout << "G1="<<filter<<endl;
         SVD::compute(filter,s,u,v);
         fSepY.push_back(u.col(0)*sqrt(s.at<float>(0,0)));
         fSepX.push_back(v.row(0)*sqrt(s.at<float>(0,0)));
@@ -371,6 +376,7 @@ SeparableSteerableFilter::SeparableSteerableFilter(int n,int height,double stepx
                 filter.at<float >(i,j)= static_cast<float>(G2c(x,y));
             }
         }
+        cout << "G2="<<filter<<endl;
         SVD::compute(filter,s,u,v);
         fSepY.push_back(u.col(0)*v.at<float>(0,height/2)*s.at<float>(0,0));
         fSepX.push_back(v.row(0)/v.at<float>(0,height/2));
@@ -595,6 +601,24 @@ Mat SeparableSteerableFilter::InvFilterL0(Mat src)
 
 }
 
+Mat SeparableSteerableFilter::FilterL0(Mat src)
+{
+    Mat f,iv0;
+
+    if (l0.rows==1)
+    {
+        sepFilter2D(src,f,CV_32F,l0,l0);
+    }
+    else
+    {
+        filter2D(src,f,CV_32F,l0);
+    }
+
+    return f;
+
+
+}
+
 Mat SeparableSteerableFilter::InvFilterL1(Mat src)
 {
     Mat f,iv0;
@@ -657,12 +681,49 @@ Mat SeparableSteerableFilter::FilterH1(Mat src)
 
     if (h1.rows==1)
     {
-        flip(l1,iv0,1);
+        flip(h1,iv0,1);
         sepFilter2D(src,f,CV_32F,iv0,iv0);
     }
     else
     {
         filter2D(src,f,CV_32F,h1);
+    }
+    return f;
+
+
+}
+
+Mat SeparableSteerableFilter::InvFilterH0(Mat src)
+{
+    Mat f,iv0;
+
+    if (h1.rows==1)
+    {
+        flip(h0,iv0,1);
+        sepFilter2D(src,f,CV_32F,iv0,iv0);
+    }
+    else
+    {
+        filter2D(src,f,CV_32F,h0);
+    }
+    return f;
+
+
+}
+
+
+Mat SeparableSteerableFilter::FilterH0(Mat src)
+{
+    Mat f,iv0;
+
+    if (h0.rows==1)
+    {
+        flip(h0,iv0,1);
+        sepFilter2D(src,f,CV_32F,iv0,iv0);
+    }
+    else
+    {
+        filter2D(src,f,CV_32F,h0);
     }
     return f;
 
@@ -901,7 +962,7 @@ void     SeparableSteerableFilter::EstimateL0L1(int nbTapL0,int nbTapL1)
 
 
     cv::fir_iirfilter::FIR_IIRFilter f(firCoefL0.data(), nbTapL0, passType, omegac*2, bw,  1./nbTapL0, windowType, 2.41);
-    vector<Mat> pp = f.OptimizeUnitaryFilter(l0CutoffFrequency,11);
+    vector<Mat> pp = f.OptimizeUnitaryFilter(l0CutoffFrequency,nbTapL0);
     Mat l01d = Mat(firCoefL0);
     l01d = l01d / sum(l01d)[0];
     vector<double> al = {-0.5,0.5,0.5, 0.25, 0.25};
@@ -914,7 +975,7 @@ void     SeparableSteerableFilter::EstimateL0L1(int nbTapL0,int nbTapL1)
     omegac=l1CutoffFrequency;
     cout<<"l0="<<pp[0]<<endl;
     cout<<"h0="<<pp[1]<<endl;
-    pp = f.OptimizeUnitaryFilter(l1CutoffFrequency,11);
+    pp = f.OptimizeUnitaryFilter(l1CutoffFrequency,nbTapL1);
     cout<<"l1="<<pp[0]<<endl;
     cout<<"h1="<<pp[1]<<endl;
     l1=f.McClellanTransform(pp[0].t(),al);
@@ -965,7 +1026,13 @@ int main(int argc, char **argv)
     Mat me;
     mcH.convertTo(me,CV_8U);
     DisplayImage(m, "original");
-    DisplayImage(mcH, "original g");
+    DisplayImage(mcH, "original gL1");
+    cout << "PSNR = " << PSNR(mc,me)<<"\n";
+    mcH = g.InvFilterL0(g.FilterL0(m))+g.InvFilterH0(g.FilterH0(m));
+    mcH.convertTo(me,CV_8U);
+    DisplayImage(mcH, "original gL0");
+    DisplayImage(g.FilterL0(m), "L0");
+    DisplayImage(g.FilterL1(m), "L1");
     cout << "PSNR = " << PSNR(mc,me)<<"\n";
     double minVal,maxVal;
     absdiff(m,mcH,m);
@@ -976,22 +1043,20 @@ int main(int argc, char **argv)
     {
         DisplayImage(g.Filter(m,i), format("g2%d",i));
     }
-	vector<Mat> w = g.LocalOrientation(m);
+	vector<Mat> w = g.LocalOrientation(mc);
 
 	DisplayImage(w[0], "LO");
 
 
 	g.DisplayFilter();
 
+    mc.convertTo(m,CV_32F);
     minMaxIdx(m,&minVal,&maxVal);
     cout <<"Original "<< minVal << "\t"<<maxVal<<endl;
-    if (g.L0().rows==1)
-        sepFilter2D(m,mLow,CV_32F,g.L0(),g.L0());
-    else
-        filter2D(m, mLow, CV_32F, g.L0());
+    mLow =g.FilterL0(m);
     minMaxIdx(mLow,&minVal,&maxVal);
     cout << minVal << "\t"<<maxVal<<endl;
-    mHigh=m-mLow;
+    mHigh=g.FilterH0(m);
     for (int i = 0; i < level.size(); i++)
     {
         Mat mH,mL;
@@ -1017,8 +1082,7 @@ int main(int argc, char **argv)
         // sepFilter2D(mLow,mLow,CV_32F,g.L1(),g.L1());
         mLow=g.InvFilterL1(mLow);
         Mat s=( g.Filter(level[i][0],0)+ g.Filter(level[i][1],1)+g.Filter(level[i][2],2));
-//        Mat s=level[i][0]+level[i][1]+level[i][2];
-        mLow=(mLow+g.InvFilterH1(s));
+        mLow=(mLow+s/6);
         DisplayImage(mLow, "collapse");
     }
     //mLow = g.InvFilterL0(mLow);
