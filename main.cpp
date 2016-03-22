@@ -332,10 +332,15 @@ SeparableSteerableFilter::SeparableSteerableFilter(int n,int height,double stepx
     Mat filter(height,height,CV_32F);
     Mat u,v,s;
     Mat filterX,filterY;
+    vector<Mat> freq(2);
+    vector<Mat> z;
+    Mat         freqMod,zeros,imCplx;
+    double minV,maxV;
 	// Decomposition SVD du filtre K=USV' diag(s) sqrt(diags(s))u(:,1) vertical kernel and sqrt(diags(s))v(:,1)' horizontal kernel (
 	// http://www.cs.toronto.edu/~urtasun/courses/CV/lecture02.pdf
     switch (n){
     case 2:
+        zeros = Mat::zeros(height,height,CV_32FC1);
         for (int i = 0; i < height; i++)
         {
             float y=static_cast<float>(i-height/2)*step;
@@ -347,11 +352,17 @@ SeparableSteerableFilter::SeparableSteerableFilter(int n,int height,double stepx
         }
         cout << "G0="<<filter<<endl;
         SVD::compute(filter,s,u,v);
-
         fSepY.push_back(u.col(0)/u.at<float>(height/2,0));
         fSepX.push_back(v.row(0)*u.at<float>(height/2,0)*s.at<float>(0,0));
-        norme2fSepX.push_back(norm(fSepX[fSepX.size()-1])*norm(fSepX[fSepX.size()-1]));
-        norme2fSepY.push_back(norm(fSepY[fSepY.size()-1])*norm(fSepY[fSepY.size()-1]));
+        freq[0]=filter;
+        freq[1]=zeros;
+        merge(freq,imCplx);
+        dft(imCplx,freqMod);
+        split(freqMod,z);
+        magnitude(z[0], z[1], freqMod);
+        minMaxLoc(freqMod,&minV,&maxV);
+        norme2fSepX.push_back((maxV));
+        norme2fSepY.push_back(1);
        for (int i = 0; i < height; i++)
         {
             float y=static_cast<float>(i-height/2)*step;
@@ -365,8 +376,15 @@ SeparableSteerableFilter::SeparableSteerableFilter(int n,int height,double stepx
         SVD::compute(filter,s,u,v);
         fSepY.push_back(u.col(0)*sqrt(s.at<float>(0,0)));
         fSepX.push_back(v.row(0)*sqrt(s.at<float>(0,0)));
-        norme2fSepX.push_back(norm(fSepX[fSepX.size()-1])*norm(fSepX[fSepX.size()-1]));
-        norme2fSepY.push_back(norm(fSepY[fSepY.size()-1])*norm(fSepY[fSepY.size()-1]));
+        freq[0]=filter;
+        freq[1]=zeros;
+        merge(freq,imCplx);
+        dft(imCplx,freqMod);
+        split(freqMod,z);
+        magnitude(z[0], z[1], freqMod);
+        minMaxLoc(freqMod,&minV,&maxV);
+        norme2fSepX.push_back((maxV));
+        norme2fSepY.push_back(1);
         for (int i = 0; i < height; i++)
         {
             float y=static_cast<float>(i-height/2)*step;
@@ -380,8 +398,15 @@ SeparableSteerableFilter::SeparableSteerableFilter(int n,int height,double stepx
         SVD::compute(filter,s,u,v);
         fSepY.push_back(u.col(0)*v.at<float>(0,height/2)*s.at<float>(0,0));
         fSepX.push_back(v.row(0)/v.at<float>(0,height/2));
-        norme2fSepX.push_back(norm(fSepX[fSepX.size()-1])*norm(fSepX[fSepX.size()-1]));
-        norme2fSepY.push_back(norm(fSepY[fSepY.size()-1])*norm(fSepY[fSepY.size()-1]));
+        freq[0]=filter;
+        freq[1]=zeros;
+        merge(freq,imCplx);
+        dft(imCplx,freqMod);
+        split(freqMod,z);
+        magnitude(z[0], z[1], freqMod);
+        minMaxLoc(freqMod,&minV,&maxV);
+        norme2fSepX.push_back((maxV));
+        norme2fSepY.push_back(1);
 // Hilbert transform
         for (int i = 0; i < height; i++)
         {
@@ -1081,8 +1106,8 @@ int main(int argc, char **argv)
         resize(mLow, mLow, Size(),2,2,INTER_NEAREST);
         // sepFilter2D(mLow,mLow,CV_32F,g.L1(),g.L1());
         mLow=g.InvFilterL1(mLow);
-        Mat s=( g.Filter(level[i][0],0)+ g.Filter(level[i][1],1)+g.Filter(level[i][2],2));
-        mLow=(mLow+s/6);
+        Mat s=g.InvFilterH1( g.Filter(level[i][0],0)+ g.Filter(level[i][1],1)+g.Filter(level[i][2],2));
+        mLow=(mLow+s);
         DisplayImage(mLow, "collapse");
     }
     //mLow = g.InvFilterL0(mLow);
